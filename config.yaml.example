@@ -1,5 +1,5 @@
 server:
-    host: 127.0.0.1                # Bind address (127.0.0.1 for local only, 0.0.0.0 for all interfaces)
+    host: 0.0.0.0                  # Bind address (0.0.0.0 for all interfaces, suitable for containers)
     port: 8080
     auth_token: your-proxy-secret-token
 
@@ -81,15 +81,16 @@ tagging:
             header_name: Content-Type      # 头部字段名
             expected_value: application/json  # 期望值，支持通配符
         
-        # Method Tagger - 匹配HTTP请求方法
+        # Header Tagger - 匹配HTTP请求方法（通过自定义头部）
         - name: post-method-detector
           type: builtin
-          builtin_type: method
+          builtin_type: header
           tag: post-request
           enabled: false
           priority: 4
           config:
-            methods: [POST, PUT]  # 支持的HTTP方法列表
+            header_name: X-HTTP-Method-Override
+            expected_value: POST
         
         # Query Tagger - 匹配URL查询参数
         - name: beta-feature-detector

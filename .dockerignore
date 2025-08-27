@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Build artifacts
+claude-code-companion
+claude-code-companion-*
+tmp/
+logs/
+
+# Development files
+.air.toml
+.vscode/
+.idea/
+
+# Test data
+testdata/
+*_test.go
+
+# Data directories
+data/
+
+# Backup files
+*.backup
+*.backup-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp

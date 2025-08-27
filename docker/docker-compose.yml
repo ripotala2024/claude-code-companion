@@ -1,0 +1,48 @@
+services:
+  claude-code-companion:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: claude-code-companion:latest
+    container_name: claude-code-companion
+    ports:
+      - "8080:8080"
+    volumes:
+      # 配置文件持久化
+      - ./data/config:/data/config
+      # 日志文件持久化
+      - ./data/logs:/data/logs
+    environment:
+      - CONFIG_FILE=/data/config/config.yaml
+      - LOG_DIR=/data/logs
+      - GIN_MODE=release
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - claude-network
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+networks:
+  claude-network:
+    driver: bridge
+
+# 可选：使用命名卷而不是绑定挂载
+# volumes:
+#   config_data:
+#     driver: local
+#   logs_data:
+#     driver: local

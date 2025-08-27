@@ -17,6 +17,25 @@ Claude Code 伴侣是一个为 Claude Code 提供的本地 API 代理工具。�
 
 ## 快速开始
 
+### 方式1: Docker 部署（推荐）
+
+```bash
+# 一键启动
+./docker/docker-quick-start.sh
+
+# 或手动启动
+cd docker
+docker-compose up -d
+```
+
+访问地址：
+- 代理服务: http://localhost:8080
+- 管理界面: http://localhost:8080/admin/
+
+详细说明请参考 [Docker 部署文档](docker/README.md)。
+
+### 方式2: 二进制部署
+
 1. 下载并解压
 
    - 从 Release 页面下载对应操作系统的压缩包，解压后进入目录。
