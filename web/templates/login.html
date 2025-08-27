@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/vendor/font-awesome/all.min.css" rel="stylesheet">
+    <link href="/static/shared.css" rel="stylesheet">
+    <link href="/static/utils.css" rel="stylesheet">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0;
+            padding: 2rem;
+            text-align: center;
+        }
+        .login-body {
+            padding: 2rem;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        .form-floating > label {
+            color: #6c757d;
+        }
+        .input-group-text {
+            background: transparent;
+            border-right: none;
+            color: #6c757d;
+        }
+        .form-control {
+            border-left: none;
+            border-radius: 0 10px 10px 0;
+        }
+        .input-group .form-control:first-child {
+            border-left: 1px solid #ced4da;
+            border-radius: 10px 0 0 10px;
+        }
+        /* 优化输入框样式 */
+        .form-floating > .form-control {
+            height: 3.2rem;
+            padding: 1rem 0.75rem;
+        }
+        .form-floating > label {
+            padding: 1rem 0.75rem;
+        }
+        .input-group {
+            height: 3.2rem;
+            width: 100%;
+        }
+        .input-group-text {
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            min-width: 50px;
+        }
+        /* 让输入框占满可用宽度 */
+        .login-body .mb-4 {
+            margin-bottom: 1.5rem !important;
+        }
+        .login-body .input-group .form-floating {
+            flex: 1;
+        }
+        .login-body .form-control {
+            width: 100% !important;
+        }
+        /* 确保登录卡片内部有合适的内边距 */
+        .login-body {
+            padding: 2rem 2.5rem 2.5rem;
+        }
+        /* 优化输入框组的布局 */
+        .login-body .input-group {
+            display: flex;
+            align-items: stretch;
+        }
+        .login-body .input-group .form-floating {
+            flex: 1;
+            min-width: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-7 col-lg-5 col-xl-4">
+                    <div class="login-card">
+                        <div class="login-header">
+                            <i class="fas fa-server fa-3x mb-3"></i>
+                            <h3 class="mb-0" data-t="admin_login_title">管理员登录</h3>
+                            <p class="mb-0 mt-2" data-t="admin_login_subtitle">Claude Code 伴侣管理后台</p>
+                        </div>
+                        <div class="login-body">
+                            {{if .Error}}
+                            <div class="alert alert-danger" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <span data-t="{{.ErrorKey}}">{{.Error}}</span>
+                            </div>
+                            {{end}}
+
+                            <form method="POST" action="/admin/login" id="loginForm">
+                                <input type="hidden" name="_csrf_token" value="{{.CSRFToken}}">
+                                {{if .RedirectTo}}
+                                <input type="hidden" name="redirect_to" value="{{.RedirectTo}}">
+                                {{end}}
+
+                                <div class="mb-4">
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-user"></i>
+                                        </span>
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="username" name="username" 
+                                                   placeholder="用户名" required autofocus>
+                                            <label for="username" data-t="username_label">用户名</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-lock"></i>
+                                        </span>
+                                        <div class="form-floating">
+                                            <input type="password" class="form-control" id="password" name="password" 
+                                                   placeholder="密码" required>
+                                            <label for="password" data-t="password_label">密码</label>
+                                        </div>
+                                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                            <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-login" id="loginBtn">
+                                        <i class="fas fa-sign-in-alt me-2"></i>
+                                        <span data-t="login_button">登录</span>
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div class="text-center mt-4">
+                                <small class="text-muted">
+                                    <i class="fas fa-shield-alt me-1"></i>
+                                    <span data-t="secure_login_notice">安全登录 - 请使用管理员凭据</span>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script>
+        // 密码显示/隐藏切换
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('togglePasswordIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        });
+
+        // 表单提交处理
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i><span data-t="logging_in">登录中...</span>';
+        });
+
+        // 回车键提交表单
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').submit();
+            }
+        });
+    </script>
+</body>
+</html>

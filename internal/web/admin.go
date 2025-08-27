@@ -22,18 +22,19 @@ type HotUpdateHandler interface {
 }
 
 type AdminServer struct {
-	config            *config.Config
-	endpointManager   *endpoint.Manager
-	taggingManager    *tagging.Manager
-	logger            *logger.Logger
-	configFilePath    string
-	hotUpdateHandler  HotUpdateHandler
-	version           string
-	i18nManager       *i18n.Manager
-	csrfManager       *security.CSRFManager
+	config           *config.Config
+	endpointManager  *endpoint.Manager
+	taggingManager   *tagging.Manager
+	logger           *logger.Logger
+	configFilePath   string
+	hotUpdateHandler HotUpdateHandler
+	version          string
+	i18nManager      *i18n.Manager
+	csrfManager      *security.CSRFManager
+	authManager      *security.AuthManager
 }
 
-func NewAdminServer(cfg *config.Config, endpointManager *endpoint.Manager, taggingManager *tagging.Manager, log *logger.Logger, configFilePath string, version string, i18nManager *i18n.Manager) *AdminServer {
+func NewAdminServer(cfg *config.Config, endpointManager *endpoint.Manager, taggingManager *tagging.Manager, log *logger.Logger, configFilePath string, version string, i18nManager *i18n.Manager, authManager *security.AuthManager) *AdminServer {
 	return &AdminServer{
 		config:          cfg,
 		endpointManager: endpointManager,
@@ -43,6 +44,7 @@ func NewAdminServer(cfg *config.Config, endpointManager *endpoint.Manager, taggi
 		version:         version,
 		i18nManager:     i18nManager,
 		csrfManager:     security.NewCSRFManager(),
+		authManager:     authManager,
 	}
 }
 
@@ -56,27 +58,27 @@ func (s *AdminServer) renderHTML(c *gin.Context, templateName string, data map[s
 	// Always detect language fresh
 	lang := s.i18nManager.GetDetector().DetectLanguage(c)
 	i18n.SetLanguageToContext(c, lang)
-	
+
 	// If i18n is disabled or language is default, render normally
 	if s.i18nManager == nil || !s.i18nManager.IsEnabled() || lang == s.i18nManager.GetDefaultLanguage() {
 		c.HTML(200, templateName, data)
 		return
 	}
-	
+
 	// For non-default languages, we need to post-process
 	// Create a custom writer that captures the output
 	originalWriter := c.Writer
 	captureWriter := &captureResponseWriter{ResponseWriter: originalWriter}
 	c.Writer = captureWriter
-	
+
 	// Render template
 	c.HTML(200, templateName, data)
-	
+
 	// Process the captured HTML through translator
 	html := captureWriter.GetHTML()
 	translator := s.i18nManager.GetTranslator()
 	translatedHTML := translator.ProcessHTML(html, lang, s.i18nManager.GetTranslation)
-	
+
 	// Write the translated HTML to original writer
 	c.Writer = originalWriter
 	c.Writer.Write([]byte(translatedHTML))
@@ -100,7 +102,7 @@ func (w *captureResponseWriter) GetHTML() string {
 // getBaseTemplateData returns common template data for all pages
 func (s *AdminServer) getBaseTemplateData(c *gin.Context, currentPage string) map[string]interface{} {
 	lang := s.i18nManager.GetDetector().DetectLanguage(c)
-	
+
 	// Build available languages data
 	availableLanguages := make([]map[string]interface{}, 0)
 	for _, availableLang := range s.i18nManager.GetAvailableLanguages() {
@@ -111,13 +113,37 @@ func (s *AdminServer) getBaseTemplateData(c *gin.Context, currentPage string) ma
 			"name": langInfo["name"],
 		})
 	}
-	
-	return map[string]interface{}{
+
+	// 获取身份验证状态
+	authEnabled := s.authManager.IsEnabled()
+	var authenticated bool
+	var currentUser *security.Session
+
+	if authEnabled {
+		currentUser, authenticated = s.authManager.GetCurrentUser(c)
+	} else {
+		authenticated = true // 如果身份验证未启用，视为已认证
+	}
+
+	baseData := map[string]interface{}{
 		"Version":            s.version,
 		"CurrentPage":        currentPage,
 		"CurrentLanguage":    string(lang),
 		"AvailableLanguages": availableLanguages,
+		"AuthEnabled":        authEnabled,
+		"Authenticated":      authenticated,
 	}
+
+	// 如果用户已登录，添加用户信息
+	if authenticated && currentUser != nil {
+		baseData["CurrentUser"] = map[string]interface{}{
+			"Username":   currentUser.Username,
+			"CreatedAt":  currentUser.CreatedAt,
+			"LastAccess": currentUser.LastAccess,
+		}
+	}
+
+	return baseData
 }
 
 // mergeTemplateData merges base template data with page-specific data
@@ -174,7 +200,7 @@ func (s *AdminServer) updateConfigWithRollback(updateFunc func() error, rollback
 	if err := updateFunc(); err != nil {
 		return err
 	}
-	
+
 	// 保存配置到文件
 	if err := config.SaveConfig(s.config, s.configFilePath); err != nil {
 		// 保存失败，尝试回滚
@@ -183,7 +209,7 @@ func (s *AdminServer) updateConfigWithRollback(updateFunc func() error, rollback
 		}
 		return fmt.Errorf("failed to save configuration: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -195,7 +221,7 @@ func (s *AdminServer) RegisterRoutes(router *gin.Engine) {
 		panic("Failed to load embedded templates: " + err.Error())
 	}
 	router.SetHTMLTemplate(templates)
-	
+
 	// 设置静态文件服务器（使用嵌入的文件系统）
 	staticFS, err := webres.GetStaticFS()
 	if err != nil {
@@ -206,21 +232,36 @@ func (s *AdminServer) RegisterRoutes(router *gin.Engine) {
 	// 注册根目录帮助页面
 	router.GET("/", s.handleHelpPage)
 
-	// 注册页面路由
-	router.GET("/admin/", s.handleDashboard)
-	router.GET("/admin/endpoints", s.handleEndpointsPage)
-	router.GET("/admin/taggers", s.handleTaggersPage)
-	router.GET("/admin/logs", s.handleLogsPage)
-	router.GET("/admin/settings", s.handleSettingsPage)
+	// 注册身份验证路由（不需要身份验证）
+	router.GET("/admin/login", s.handleLoginPage)
+	router.POST("/admin/login", s.handleLoginSubmit)
+	router.POST("/admin/logout", s.handleLogout)
 
-	// 注册 API 路由，添加UTF-8字符集中间件和CSRF防护
+	// 注册管理页面路由（需要身份验证）
+	adminGroup := router.Group("/admin")
+	adminGroup.Use(s.authManager.AuthMiddleware()) // 添加身份验证中间件
+	{
+		adminGroup.GET("", s.handleDashboard)  // 处理 /admin 路径
+		adminGroup.GET("/", s.handleDashboard) // 处理 /admin/ 路径
+		adminGroup.GET("/endpoints", s.handleEndpointsPage)
+		adminGroup.GET("/taggers", s.handleTaggersPage)
+		adminGroup.GET("/logs", s.handleLogsPage)
+		adminGroup.GET("/settings", s.handleSettingsPage)
+	}
+
+	// 注册 API 路由，添加身份验证、UTF-8字符集中间件和CSRF防护
 	api := router.Group("/admin/api")
-	api.Use(s.utf8JsonMiddleware()) // 添加UTF-8中间件
-	api.Use(s.csrfManager.Middleware()) // 添加CSRF防护
+	api.Use(s.authManager.AuthMiddleware()) // 添加身份验证中间件
+	api.Use(s.utf8JsonMiddleware())         // 添加UTF-8中间件
+	api.Use(s.csrfManager.Middleware())     // 添加CSRF防护
 	{
 		// CSRF token端点（GET请求，不需要CSRF验证）
 		api.GET("/csrf-token", s.handleGetCSRFToken)
-		
+
+		// 身份验证相关API端点
+		api.GET("/auth/status", s.handleAuthStatus)
+		api.GET("/auth/user", s.handleGetCurrentUser)
+
 		api.GET("/endpoints", s.handleGetEndpoints)
 		api.PUT("/endpoints", s.handleUpdateEndpoints)
 		api.POST("/endpoints", s.handleCreateEndpoint)
@@ -231,16 +272,16 @@ func (s *AdminServer) RegisterRoutes(router *gin.Engine) {
 		api.POST("/endpoints/:id/copy", s.handleCopyEndpoint)
 		api.POST("/endpoints/:id/toggle", s.handleToggleEndpoint)
 		api.POST("/endpoints/reorder", s.handleReorderEndpoints)
-		
+
 		// 端点向导路由
 		s.registerEndpointWizardRoutes(api)
-		
+
 		api.GET("/taggers", s.handleGetTaggers)
 		api.POST("/taggers", s.handleCreateTagger)
 		api.PUT("/taggers/:name", s.handleUpdateTagger)
 		api.DELETE("/taggers/:name", s.handleDeleteTagger)
 		api.GET("/tags", s.handleGetTags)
-		
+
 		api.GET("/logs", s.handleGetLogs)
 		api.POST("/logs/cleanup", s.handleCleanupLogs)
 		api.GET("/logs/stats", s.handleGetLogStats)
@@ -248,7 +289,7 @@ func (s *AdminServer) RegisterRoutes(router *gin.Engine) {
 		api.PUT("/config", s.handleHotUpdateConfig)
 		api.GET("/config", s.handleGetConfig)
 		api.PUT("/settings", s.handleUpdateSettings)
-		
+
 		// 翻译API
 		api.GET("/translations", s.handleGetTranslations)
 	}
@@ -259,7 +300,7 @@ func (s *AdminServer) utf8JsonMiddleware() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		// 处理请求
 		c.Next()
-		
+
 		// 如果响应是JSON，确保Content-Type包含UTF-8字符集
 		contentType := c.Writer.Header().Get("Content-Type")
 		if contentType == "application/json" {
@@ -281,8 +322,8 @@ func (s *AdminServer) i18nMiddleware() gin.HandlerFunc {
 		i18n.SetLanguageToContext(c, lang)
 
 		// Only apply translation for /admin/ pages
-		if strings.HasPrefix(c.Request.URL.Path, "/admin/") && 
-		   !strings.HasPrefix(c.Request.URL.Path, "/admin/api/") {
+		if strings.HasPrefix(c.Request.URL.Path, "/admin/") &&
+			!strings.HasPrefix(c.Request.URL.Path, "/admin/api/") {
 			// Override HTML response to process translations
 			originalWriter := c.Writer
 			c.Writer = &translatingResponseWriter{
@@ -325,7 +366,7 @@ func (s *AdminServer) handleGetCSRFToken(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"csrf_token": token,
 	})
@@ -337,16 +378,15 @@ func (s *AdminServer) handleGetTranslations(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{})
 		return
 	}
-	
+
 	// Get all translations from the manager
 	allTranslations := s.i18nManager.GetAllTranslations()
-	
+
 	// Format the response for client consumption
 	response := make(map[string]map[string]string)
 	for lang, translations := range allTranslations {
 		response[string(lang)] = translations
 	}
-	
+
 	c.JSON(http.StatusOK, response)
 }
-

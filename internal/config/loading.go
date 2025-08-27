@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/yaml.v3"
 	"claude-code-companion/internal/i18n"
+
+	"gopkg.in/yaml.v3"
 )
 
 func LoadConfig(filename string) (*Config, error) {
@@ -29,6 +30,11 @@ func LoadConfig(filename string) (*Config, error) {
 	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %v", err)
+	}
+
+	// 处理环境变量覆盖
+	if err := applyEnvironmentOverrides(&config); err != nil {
+		return nil, fmt.Errorf("failed to apply environment overrides: %v", err)
 	}
 
 	if err := validateConfig(&config); err != nil {
@@ -100,10 +106,16 @@ func generateDefaultConfig(filename string) error {
 		},
 		Timeouts: TimeoutConfig{
 			TLSHandshake:       "10s",
-			ResponseHeader:     "60s", 
+			ResponseHeader:     "60s",
 			IdleConnection:     "90s",
 			HealthCheckTimeout: "30s",
 			CheckInterval:      "30s",
+		},
+		Auth: AuthConfig{
+			Enabled:        Default.Auth.Enabled,
+			Username:       Default.Auth.Username,
+			Password:       Default.Auth.Password,
+			SessionTimeout: Default.Auth.SessionTimeout,
 		},
 	}
 
@@ -156,6 +168,28 @@ func SaveConfig(config *Config, filename string) error {
 	// 写入新配置
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
+	}
+
+	return nil
+}
+
+// applyEnvironmentOverrides 应用环境变量覆盖配置
+func applyEnvironmentOverrides(config *Config) error {
+	// 处理身份验证相关的环境变量
+	if username := os.Getenv("ADMIN_USERNAME"); username != "" {
+		config.Auth.Username = username
+		config.Auth.Enabled = true // 如果设置了用户名，自动启用身份验证
+	}
+
+	if password := os.Getenv("ADMIN_PASSWORD"); password != "" {
+		// 这里存储明文密码，稍后在session管理器中进行哈希处理
+		config.Auth.Password = password
+		config.Auth.Enabled = true // 如果设置了密码，自动启用身份验证
+	}
+
+	// 如果设置了用户名或密码，但Auth配置为空，则使用默认值
+	if config.Auth.Enabled && config.Auth.SessionTimeout == "" {
+		config.Auth.SessionTimeout = Default.Auth.SessionTimeout
 	}
 
 	return nil

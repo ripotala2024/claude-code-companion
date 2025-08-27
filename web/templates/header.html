@@ -29,9 +29,78 @@
                     {{end}}
                 </ul>
             </div>
+
+            <!-- 用户信息下拉菜单（仅在启用身份验证时显示） -->
+            <div class="nav-item dropdown" id="userDropdown" style="display: none;">
+                <a class="nav-link dropdown-toggle" href="#" id="userMenuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-circle me-1"></i>
+                    <span id="currentUsername" data-t="admin_user">管理员</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDropdown">
+                    <li><h6 class="dropdown-header" data-t="user_info_header">用户信息</h6></li>
+                    <li><span class="dropdown-item-text"><small><i class="fas fa-user me-1"></i><span data-t="username_label">用户名</span>: <span id="userInfoUsername">-</span></small></span></li>
+                    <li><span class="dropdown-item-text"><small><i class="fas fa-clock me-1"></i><span data-t="login_time_label">登录时间</span>: <span id="userInfoLoginTime">-</span></small></span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="POST" action="/admin/logout" style="margin: 0;">
+                            <button type="submit" class="dropdown-item text-danger">
+                                <i class="fas fa-sign-out-alt me-1"></i>
+                                <span data-t="logout_button">登出</span>
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+
             <a class="nav-link" href="https://github.com/kxn/claude-code-companion" target="_blank" data-t-title="github_repository_title" title="GitHub 仓库">
                 <i class="fab fa-github"></i>
             </a>
         </div>
     </div>
 </nav>
+
+<script>
+// 检查身份验证状态并更新用户界面
+function checkAuthStatus() {
+    fetch('/admin/api/auth/status')
+        .then(response => response.json())
+        .then(data => {
+            const userDropdown = document.getElementById('userDropdown');
+
+            if (data.auth_enabled && data.authenticated) {
+                // 身份验证启用且用户已登录，显示用户下拉菜单
+                userDropdown.style.display = 'block';
+
+                // 获取用户详细信息
+                fetch('/admin/api/auth/user')
+                    .then(response => response.json())
+                    .then(userData => {
+                        if (userData.authenticated && userData.user) {
+                            document.getElementById('currentUsername').textContent = userData.user.username;
+                            document.getElementById('userInfoUsername').textContent = userData.user.username;
+
+                            // 格式化登录时间
+                            const loginTime = new Date(userData.user.created_at);
+                            document.getElementById('userInfoLoginTime').textContent = loginTime.toLocaleString();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Failed to fetch user info:', error);
+                    });
+            } else {
+                // 身份验证未启用或用户未登录，隐藏用户下拉菜单
+                userDropdown.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Failed to check auth status:', error);
+            // 出错时隐藏用户下拉菜单
+            document.getElementById('userDropdown').style.display = 'none';
+        });
+}
+
+// 页面加载时检查身份验证状态
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthStatus();
+});
+</script>

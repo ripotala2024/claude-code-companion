@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"fmt"
+	"time"
 
 	"claude-code-companion/internal/config"
 	"claude-code-companion/internal/conversion"
@@ -10,6 +11,7 @@ import (
 	"claude-code-companion/internal/i18n"
 	"claude-code-companion/internal/logger"
 	"claude-code-companion/internal/modelrewrite"
+	"claude-code-companion/internal/security"
 	"claude-code-companion/internal/tagging"
 	"claude-code-companion/internal/validator"
 	"claude-code-companion/internal/web"
@@ -24,10 +26,12 @@ type Server struct {
 	validator       *validator.ResponseValidator
 	healthChecker   *health.Checker
 	adminServer     *web.AdminServer
-	taggingManager  *tagging.Manager       // 新增：tagging系统管理器
-	modelRewriter   *modelrewrite.Rewriter // 新增：模型重写器
-	converter       conversion.Converter   // 新增：格式转换器
-	i18nManager     *i18n.Manager          // 新增：国际化管理器
+	taggingManager  *tagging.Manager         // 新增：tagging系统管理器
+	modelRewriter   *modelrewrite.Rewriter   // 新增：模型重写器
+	converter       conversion.Converter     // 新增：格式转换器
+	i18nManager     *i18n.Manager            // 新增：国际化管理器
+	sessionManager  *security.SessionManager // 新增：会话管理器
+	authManager     *security.AuthManager    // 新增：身份验证管理器
 	router          *gin.Engine
 	configFilePath  string
 }
@@ -74,14 +78,22 @@ func NewServer(cfg *config.Config, configFilePath string, version string) (*Serv
 	if cfg.I18n.DefaultLanguage == "" {
 		i18nConfig = i18n.DefaultConfig()
 	}
-	
+
 	i18nManager, err := i18n.NewManager(i18nConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize i18n manager: %v", err)
 	}
 
+	// 创建会话管理器
+	defaultTimeout, _ := time.ParseDuration(config.Default.Auth.SessionTimeout)
+	sessionTimeout := config.GetTimeoutDuration(cfg.Auth.SessionTimeout, defaultTimeout)
+	sessionManager := security.NewSessionManager(sessionTimeout)
+
+	// 创建身份验证管理器
+	authManager := security.NewAuthManager(sessionManager, cfg.Auth.Username, cfg.Auth.Password, cfg.Auth.Enabled)
+
 	// 创建管理界面服务器（永远启用）
-	adminServer := web.NewAdminServer(cfg, endpointManager, taggingManager, log, configFilePath, version, i18nManager)
+	adminServer := web.NewAdminServer(cfg, endpointManager, taggingManager, log, configFilePath, version, i18nManager, authManager)
 
 	server := &Server{
 		config:          cfg,
@@ -94,6 +106,8 @@ func NewServer(cfg *config.Config, configFilePath string, version string) (*Serv
 		modelRewriter:   modelRewriter,  // 新增：设置模型重写器
 		converter:       converter,      // 新增：设置格式转换器
 		i18nManager:     i18nManager,    // 新增：设置国际化管理器
+		sessionManager:  sessionManager, // 新增：设置会话管理器
+		authManager:     authManager,    // 新增：设置身份验证管理器
 		configFilePath:  configFilePath,
 	}
 
@@ -168,6 +182,11 @@ func (s *Server) HotUpdateConfig(newConfig *config.Config) error {
 	// 更新验证器配置
 	s.updateValidatorConfig(newConfig.Validation)
 
+	// 更新身份验证配置
+	if err := s.updateAuthConfig(newConfig.Auth); err != nil {
+		s.logger.Error("Failed to update auth config, continuing with other updates", err)
+	}
+
 	// 更新内存中的配置
 	s.config = newConfig
 
@@ -236,9 +255,14 @@ func (s *Server) createOAuthTokenRefreshCallback() func(*endpoint.Endpoint) erro
 				break
 			}
 		}
-		
+
 		// 保存到配置文件
 		return s.saveConfigToFile()
 	}
 }
 
+// updateAuthConfig 更新身份验证配置
+func (s *Server) updateAuthConfig(newAuthConfig config.AuthConfig) error {
+	// 更新身份验证管理器的凭据
+	return s.authManager.UpdateCredentials(newAuthConfig.Username, newAuthConfig.Password, newAuthConfig.Enabled)
+}

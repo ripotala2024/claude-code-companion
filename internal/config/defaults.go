@@ -15,7 +15,7 @@ type DefaultValues struct {
 	// 超时配置默认值 (字符串格式用于配置文件)
 	Timeouts struct {
 		TLSHandshake       string
-		ResponseHeader     string  
+		ResponseHeader     string
 		IdleConnection     string
 		HealthCheckTimeout string
 		CheckInterval      string
@@ -30,22 +30,22 @@ type DefaultValues struct {
 
 	// 健康检查默认值
 	HealthCheck struct {
-		MaxTokens   int
-		Temperature float64
-		StreamMode  bool
-		Model       string
-		UserID      string
-		Headers     map[string]string
+		MaxTokens        int
+		Temperature      float64
+		StreamMode       bool
+		Model            string
+		UserID           string
+		Headers          map[string]string
 		FailureThreshold int
 	}
 
 	// 日志配置默认值
 	Logging struct {
-		Level           string
-		LogRequestTypes string
-		LogRequestBody  string  
-		LogResponseBody string
-		LogDirectory    string
+		Level            string
+		LogRequestTypes  string
+		LogRequestBody   string
+		LogResponseBody  string
+		LogDirectory     string
 		BodyTruncateSize int
 	}
 
@@ -66,7 +66,7 @@ type DefaultValues struct {
 		HeaderName      string
 	}
 
-	// 验证配置默认值  
+	// 验证配置默认值
 	Validation struct {
 		PythonJSONFix struct {
 			Enabled      bool
@@ -98,10 +98,18 @@ type DefaultValues struct {
 		MaxPages     int
 	}
 
-	// 代理拨号器默认值  
+	// 代理拨号器默认值
 	ProxyDialer struct {
 		Timeout   time.Duration
 		KeepAlive time.Duration
+	}
+
+	// 身份验证配置默认值
+	Auth struct {
+		Enabled        bool
+		Username       string
+		Password       string
+		SessionTimeout string
 	}
 }
 
@@ -118,14 +126,14 @@ var Default = DefaultValues{
 	Timeouts: struct {
 		TLSHandshake       string
 		ResponseHeader     string
-		IdleConnection     string  
+		IdleConnection     string
 		HealthCheckTimeout string
 		CheckInterval      string
 		RecoveryThreshold  int
 	}{
 		TLSHandshake:       "10s",
 		ResponseHeader:     "60s",
-		IdleConnection:     "90s", 
+		IdleConnection:     "90s",
 		HealthCheckTimeout: "30s",
 		CheckInterval:      "30s",
 		RecoveryThreshold:  1,
@@ -140,12 +148,12 @@ var Default = DefaultValues{
 	},
 
 	HealthCheck: struct {
-		MaxTokens   int
-		Temperature float64
-		StreamMode  bool
-		Model       string
-		UserID      string
-		Headers     map[string]string
+		MaxTokens        int
+		Temperature      float64
+		StreamMode       bool
+		Model            string
+		UserID           string
+		Headers          map[string]string
 		FailureThreshold int
 	}{
 		MaxTokens:   512,
@@ -154,43 +162,43 @@ var Default = DefaultValues{
 		Model:       "claude-3-5-haiku-20241022",
 		UserID:      "user_test_account__session_test",
 		Headers: map[string]string{
-			"Accept":                                      "application/json",
-			"Accept-Encoding":                             "gzip, deflate",
-			"Accept-Language":                             "*",
-			"Anthropic-Beta":                              "fine-grained-tool-streaming-2025-05-14",
-			"Anthropic-Dangerous-Direct-Browser-Access":   "true",
-			"Anthropic-Version":                           "2023-06-01",
-			"Connection":                                  "keep-alive",
-			"Content-Type":                                "application/json",
-			"Sec-Fetch-Mode":                              "cors",
-			"User-Agent":                                  "claude-cli/1.0.56 (external, cli)",
-			"X-App":                                       "cli",
-			"X-Stainless-Arch":                            "x64",
-			"X-Stainless-Helper-Method":                   "stream",
-			"X-Stainless-Lang":                            "js",
-			"X-Stainless-Os":                              "Windows",
-			"X-Stainless-Package-Version":                 "0.55.1",
-			"X-Stainless-Retry-Count":                     "0",
-			"X-Stainless-Runtime":                         "node",
-			"X-Stainless-Runtime-Version":                 "v22.17.0",
-			"X-Stainless-Timeout":                         "600",
+			"Accept":          "application/json",
+			"Accept-Encoding": "gzip, deflate",
+			"Accept-Language": "*",
+			"Anthropic-Beta":  "fine-grained-tool-streaming-2025-05-14",
+			"Anthropic-Dangerous-Direct-Browser-Access": "true",
+			"Anthropic-Version":                         "2023-06-01",
+			"Connection":                                "keep-alive",
+			"Content-Type":                              "application/json",
+			"Sec-Fetch-Mode":                            "cors",
+			"User-Agent":                                "claude-cli/1.0.56 (external, cli)",
+			"X-App":                                     "cli",
+			"X-Stainless-Arch":                          "x64",
+			"X-Stainless-Helper-Method":                 "stream",
+			"X-Stainless-Lang":                          "js",
+			"X-Stainless-Os":                            "Windows",
+			"X-Stainless-Package-Version":               "0.55.1",
+			"X-Stainless-Retry-Count":                   "0",
+			"X-Stainless-Runtime":                       "node",
+			"X-Stainless-Runtime-Version":               "v22.17.0",
+			"X-Stainless-Timeout":                       "600",
 		},
 		FailureThreshold: 3,
 	},
 
 	Logging: struct {
-		Level           string
-		LogRequestTypes string
-		LogRequestBody  string
-		LogResponseBody string
-		LogDirectory    string
+		Level            string
+		LogRequestTypes  string
+		LogRequestBody   string
+		LogResponseBody  string
+		LogDirectory     string
 		BodyTruncateSize int
 	}{
-		Level:           "info",
-		LogRequestTypes: "all",
-		LogRequestBody:  "none",
-		LogResponseBody: "none",
-		LogDirectory:    "./logs",
+		Level:            "info",
+		LogRequestTypes:  "all",
+		LogRequestBody:   "none",
+		LogResponseBody:  "none",
+		LogDirectory:     "./logs",
 		BodyTruncateSize: 1000,
 	},
 
@@ -278,6 +286,18 @@ var Default = DefaultValues{
 	}{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
+	},
+
+	Auth: struct {
+		Enabled        bool
+		Username       string
+		Password       string
+		SessionTimeout string
+	}{
+		Enabled:        false,   // 默认禁用身份验证
+		Username:       "admin", // 默认用户名
+		Password:       "",      // 默认无密码，需要通过环境变量设置
+		SessionTimeout: "24h",   // 默认会话超时24小时
 	},
 }
 
