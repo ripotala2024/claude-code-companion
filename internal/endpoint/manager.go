@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ type Manager struct {
 	statisticsManager statistics.StatisticsManager
 }
 
-func NewManager(cfg *config.Config) *Manager {
+func NewManager(cfg *config.Config) (*Manager, error) {
 	// Initialize statistics manager
 	// Use log directory for statistics database, or current directory as fallback
 	dataDirectory := cfg.Logging.LogDirectory
@@ -33,39 +34,19 @@ func NewManager(cfg *config.Config) *Manager {
 
 	statisticsManager, err := statistics.NewStatisticsManager(dataDirectory)
 	if err != nil {
-		// This should rarely happen now with the fallback mechanism
-		log.Printf("ERROR: Failed to initialize any statistics manager: %v", err)
-		log.Printf("Statistics functionality will be completely disabled")
-		statisticsManager = nil
-	} else {
-		dbPath := statisticsManager.GetDatabasePath()
-		if dbPath == "memory-only (no persistent storage)" {
-			log.Printf("WARNING: Using memory-only statistics (no persistence)")
-			log.Printf("Statistics will reset when the service restarts")
-			log.Printf("This may be due to file permission issues or insufficient disk space")
-			log.Printf("Check logs for specific error details")
-		} else {
-			log.Printf("Statistics persistence initialized successfully (database: %s)", dbPath)
-		}
+		log.Printf("ERROR: Failed to initialize statistics manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize statistics manager: %w", err)
 	}
 
 	endpoints := make([]*Endpoint, 0, len(cfg.Endpoints))
 	for _, endpointConfig := range cfg.Endpoints {
 		endpoint := NewEndpoint(endpointConfig)
 		
-		// Initialize or inherit statistics data if statistics manager is available
-		if statisticsManager != nil {
-			if err := initializeEndpointStatistics(endpoint, statisticsManager); err != nil {
-				log.Printf("WARNING: Failed to initialize statistics for endpoint %s: %v", 
-					endpoint.Name, err)
-				log.Printf("Endpoint %s will start with zero statistics", endpoint.Name)
-			} else {
-				log.Printf("Statistics loaded for endpoint %s: TotalRequests=%d, SuccessRequests=%d", 
-					endpoint.Name, endpoint.TotalRequests, endpoint.SuccessRequests)
-			}
-		} else {
-			log.Printf("Statistics persistence unavailable - endpoint %s will start with zero statistics", 
-				endpoint.Name)
+		// Initialize or inherit statistics data
+		if err := initializeEndpointStatistics(endpoint, statisticsManager); err != nil {
+			log.Printf("ERROR: Failed to initialize statistics for endpoint %s: %v", 
+				endpoint.Name, err)
+			return nil, fmt.Errorf("failed to initialize statistics for endpoint %s: %w", endpoint.Name, err)
 		}
 		
 		endpoints = append(endpoints, endpoint)
@@ -80,7 +61,7 @@ func NewManager(cfg *config.Config) *Manager {
 		statisticsManager: statisticsManager,
 	}
 
-	return manager
+	return manager, nil
 }
 
 func (m *Manager) GetEndpoint() (*Endpoint, error) {
@@ -96,14 +77,14 @@ func (m *Manager) GetAllEndpoints() []*Endpoint {
 	return m.selector.GetAllEndpoints()
 }
 
-func (m *Manager) RecordRequest(endpointID string, success bool) {
+func (m *Manager) RecordRequest(endpointID string, success bool, requestID string) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	for _, endpoint := range m.endpoints {
 		if endpoint.ID == endpointID {
 			// Update in-memory statistics
-			endpoint.RecordRequest(success)
+			endpoint.RecordRequest(success, requestID)
 			
 			// Update database statistics if statistics manager is available
 			if m.statisticsManager != nil {
@@ -178,6 +159,21 @@ func (m *Manager) SetHealthChecker(checker HealthChecker) {
 	m.startHealthChecks()
 }
 
+// ResetEndpointStatus resets an endpoint's status to active and clears failure statistics
+func (m *Manager) ResetEndpointStatus(endpointName string) error {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	for _, endpoint := range m.endpoints {
+		if endpoint.Name == endpointName {
+			endpoint.MarkActive()
+			return nil
+		}
+	}
+
+	return fmt.Errorf("endpoint not found: %s", endpointName)
+}
+
 func (m *Manager) startHealthChecks() {
 	// 如果没有健康检查器，不启动
 	if m.healthChecker == nil {
@@ -216,10 +212,10 @@ func (m *Manager) runHealthCheck(endpoint *Endpoint, ticker *time.Ticker) {
 		
 		if err := m.healthChecker.CheckEndpoint(endpoint); err != nil {
 			// 健康检查失败，重置连续成功次数
-			endpoint.RecordRequest(false)
+			endpoint.RecordRequest(false, "health-check")
 		} else {
 			// 健康检查成功，记录成功并检查是否达到恢复阈值
-			endpoint.RecordRequest(true)
+			endpoint.RecordRequest(true, "health-check")
 			if endpoint.GetSuccessiveSuccesses() >= recoveryThreshold {
 				// 达到恢复阈值，恢复为可用状态
 				endpoint.MarkActive()
