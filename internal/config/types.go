@@ -5,10 +5,11 @@ type Config struct {
 	Endpoints  []EndpointConfig `yaml:"endpoints"`
 	Logging    LoggingConfig    `yaml:"logging"`
 	Validation ValidationConfig `yaml:"validation"`
-	Tagging    TaggingConfig    `yaml:"tagging"`  // 标签系统配置（永远启用）
-	Timeouts   TimeoutConfig    `yaml:"timeouts"` // 超时配置
-	I18n       I18nConfig       `yaml:"i18n"`     // 国际化配置
-	Auth       AuthConfig       `yaml:"auth"`     // 身份验证配置
+	Tagging    TaggingConfig    `yaml:"tagging"`     // 标签系统配置（永远启用）
+	Timeouts   TimeoutConfig    `yaml:"timeouts"`    // 超时配置
+	I18n       I18nConfig       `yaml:"i18n"`        // 国际化配置
+	Auth       AuthConfig       `yaml:"auth"`        // 身份验证配置
+	ClientAuth ClientAuthConfig `yaml:"client_auth"` // 客户端认证配置
 }
 
 // I18nConfig 国际化配置
@@ -165,4 +166,10 @@ type AuthConfig struct {
 	Username       string `yaml:"username"`        // 管理员用户名
 	Password       string `yaml:"password"`        // 管理员密码（哈希值）
 	SessionTimeout string `yaml:"session_timeout"` // 会话超时时间，如 "24h"
+}
+
+// ClientAuthConfig 客户端认证配置
+type ClientAuthConfig struct {
+	Enabled       bool   `yaml:"enabled"`        // 是否启用客户端认证
+	RequiredToken string `yaml:"required_token"` // 必需的客户端认证令牌
 }

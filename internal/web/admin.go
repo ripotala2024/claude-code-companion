@@ -289,6 +289,7 @@ func (s *AdminServer) RegisterRoutes(router *gin.Engine) {
 		api.PUT("/config", s.handleHotUpdateConfig)
 		api.GET("/config", s.handleGetConfig)
 		api.PUT("/settings", s.handleUpdateSettings)
+		api.POST("/settings/generate-client-token", s.handleGenerateClientToken)
 
 		// 翻译API
 		api.GET("/translations", s.handleGetTranslations)

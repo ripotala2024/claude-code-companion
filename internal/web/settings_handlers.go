@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"claude-code-companion/internal/config"
+	"claude-code-companion/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,11 +14,13 @@ import (
 func deepCopyConfig(src *config.Config) config.Config {
 	// 拷贝基本字段
 	dst := config.Config{
-		Server:      src.Server,
-		Logging:     src.Logging,
-		Validation:  src.Validation,
-		Timeouts:    src.Timeouts, // 新的TimeoutConfig是值类型，可以直接赋值
-		I18n:        src.I18n,
+		Server:     src.Server,
+		Logging:    src.Logging,
+		Validation: src.Validation,
+		Timeouts:   src.Timeouts, // 新的TimeoutConfig是值类型，可以直接赋值
+		I18n:       src.I18n,
+		Auth:       src.Auth,       // 新增：Auth配置拷贝
+		ClientAuth: src.ClientAuth, // 新增：ClientAuth配置拷贝
 	}
 	
 	// 深拷贝 Tagging.Taggers slice
@@ -102,6 +105,7 @@ func (s *AdminServer) handleUpdateSettings(c *gin.Context) {
 		Logging    config.LoggingConfig        `json:"logging"`
 		Validation config.ValidationConfig    `json:"validation"`
 		Timeouts   config.TimeoutConfig        `json:"timeouts"`
+		ClientAuth config.ClientAuthConfig     `json:"client_auth"`
 	}
 
 	var request SettingsRequest
@@ -119,6 +123,7 @@ func (s *AdminServer) handleUpdateSettings(c *gin.Context) {
 	newConfig.Logging = request.Logging
 	newConfig.Validation = request.Validation
 	newConfig.Timeouts = request.Timeouts
+	newConfig.ClientAuth = request.ClientAuth
 
 	// 验证新配置
 	if err := config.ValidateConfig(&newConfig); err != nil {
@@ -161,4 +166,20 @@ func (s *AdminServer) handleHelpPage(c *gin.Context) {
 		"BaseURL": baseURL,
 	})
 	s.renderHTML(c, "help.html", data)
+}
+
+// handleGenerateClientToken 处理生成客户端认证令牌
+func (s *AdminServer) handleGenerateClientToken(c *gin.Context) {
+	token, err := utils.GenerateClientAuthToken()
+	if err != nil {
+		s.logger.Error("Failed to generate client auth token", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate client auth token: " + err.Error(),
+		})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"token": token,
+	})
 }

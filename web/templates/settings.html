@@ -131,6 +131,43 @@
                             </div>
                         </div>
 
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6 data-t="client_auth_configuration">客户端认证设置</h6>
+                                <small class="text-muted" data-t="client_auth_help">控制客户端访问代理服务的认证</small>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientAuthEnabled" {{if .Config.ClientAuth.Enabled}}checked{{end}}>
+                                        <label class="form-check-label" for="clientAuthEnabled" data-t="enable_client_auth">启用客户端认证</label>
+                                    </div>
+                                    <small class="form-text text-muted" data-t="client_auth_enabled_help">启用后，客户端必须提供有效令牌才能访问代理</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="clientAuthToken" class="form-label" data-t="auth_token">认证令牌</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control font-monospace" id="clientAuthToken" value="{{.Config.ClientAuth.RequiredToken}}" readonly data-t-placeholder="click_generate_button" placeholder="点击生成按钮生成令牌">
+                                        <button class="btn btn-outline-primary" type="button" id="generateTokenBtn" data-t="generate">生成</button>
+                                        <button class="btn btn-outline-secondary" type="button" id="copyTokenBtn" data-t="copy">复制</button>
+                                    </div>
+                                    <small class="form-text text-muted" data-t="token_format_help">令牌格式：sk- + 48个随机字符</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-info" role="alert">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong data-t="usage_instructions">使用说明：</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li data-t="client_auth_usage_1">生成令牌后，客户端需要在 Authorization 头中提供</li>
+                                        <li data-t="client_auth_usage_2">格式：Authorization: Bearer &lt;your-token&gt;</li>
+                                        <li data-t="client_auth_usage_3">保存配置后令牌即刻生效</li>
+                                        <li data-t="client_auth_usage_4">禁用认证时，所有客户端都可访问代理</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>

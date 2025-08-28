@@ -111,6 +111,12 @@ type DefaultValues struct {
 		Password       string
 		SessionTimeout string
 	}
+
+	// 客户端认证配置默认值
+	ClientAuth struct {
+		Enabled       bool
+		RequiredToken string
+	}
 }
 
 // Default 全局默认值实例
@@ -298,6 +304,14 @@ var Default = DefaultValues{
 		Username:       "admin", // 默认用户名
 		Password:       "",      // 默认无密码，需要通过环境变量设置
 		SessionTimeout: "24h",   // 默认会话超时24小时
+	},
+
+	ClientAuth: struct {
+		Enabled       bool
+		RequiredToken string
+	}{
+		Enabled:       true, // 默认启用客户端认证
+		RequiredToken: "",   // 默认无令牌，需要生成
 	},
 }
 

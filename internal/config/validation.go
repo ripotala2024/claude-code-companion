@@ -112,6 +112,11 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("oauth configuration error: %v", err)
 	}
 
+	// 验证客户端认证配置
+	if err := validateClientAuthConfig(&config.ClientAuth); err != nil {
+		return fmt.Errorf("client auth configuration error: %v", err)
+	}
+
 	return nil
 }
 
@@ -472,6 +477,23 @@ func validateEndpoint(endpoint EndpointConfig, index int) error {
 	// OAuth 认证不需要 auth_value，其他认证类型需要
 	if endpoint.AuthType != "oauth" && endpoint.AuthValue == "" {
 		return fmt.Errorf("endpoint %d: auth_value cannot be empty for non-oauth authentication", index)
+	}
+	
+	return nil
+}
+
+// validateClientAuthConfig 验证客户端认证配置
+func validateClientAuthConfig(config *ClientAuthConfig) error {
+	// 如果有令牌，验证令牌格式
+	if config.RequiredToken != "" {
+		// 令牌应该以 "sk-" 开头，后面跟着48个字符
+		if !strings.HasPrefix(config.RequiredToken, "sk-") {
+			return fmt.Errorf("client auth token must start with 'sk-'")
+		}
+		
+		if len(config.RequiredToken) != 51 { // "sk-" + 48 characters
+			return fmt.Errorf("client auth token must be 51 characters long (sk- + 48 characters)")
+		}
 	}
 	
 	return nil

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,6 +17,12 @@ func (s *Server) handleProxy(c *gin.Context) {
 	requestID := c.GetString("request_id")
 	startTime := c.MustGet("start_time").(time.Time)
 	path := c.Param("path")
+
+	// 验证客户端认证
+	if err := s.validateClientAuth(c); err != nil {
+		s.sendProxyError(c, http.StatusUnauthorized, "client_auth_required", err.Error(), requestID)
+		return
+	}
 
 	// 读取请求体
 	requestBody, err := s.readRequestBody(c)
@@ -153,5 +160,44 @@ func (s *Server) endpointMatchesTags(ep *endpoint.Endpoint, requestTags []string
 		}
 	}
 	return true
+}
+
+// validateClientAuth 验证客户端认证
+func (s *Server) validateClientAuth(c *gin.Context) error {
+	// 检查是否启用客户端认证
+	if !s.config.ClientAuth.Enabled {
+		return nil // 客户端认证未启用，跳过验证
+	}
+	
+	// 检查服务器端是否配置了有效的token
+	if s.config.ClientAuth.RequiredToken == "" {
+		return fmt.Errorf("server configuration error: client authentication is enabled but no token is configured")
+	}
+	
+	// 从请求头获取认证令牌
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return fmt.Errorf("missing Authorization header")
+	}
+	
+	// 检查是否以 "Bearer " 开头
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(authHeader, bearerPrefix) {
+		return fmt.Errorf("invalid Authorization header format, expected: Bearer <token>")
+	}
+	
+	// 提取令牌
+	token := authHeader[len(bearerPrefix):]
+	if token == "" {
+		return fmt.Errorf("empty token in Authorization header")
+	}
+	
+	// 使用常量时间比较防止时序攻击
+	expectedToken := s.config.ClientAuth.RequiredToken
+	if subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) != 1 {
+		return fmt.Errorf("invalid authentication token")
+	}
+	
+	return nil
 }
 

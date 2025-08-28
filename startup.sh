@@ -20,6 +20,13 @@ DEFAULT_PASSWORD="test123"
 DEFAULT_PORT="8080"
 CONFIG_FILE="config.yaml"
 
+# 生成客户端认证令牌的函数
+generate_client_auth_token() {
+    # 生成 sk- 开头的48字符随机令牌
+    local token_suffix=$(openssl rand -hex 24 2>/dev/null || xxd -l 24 -p /dev/urandom 2>/dev/null || od -An -tx1 -N24 /dev/urandom | tr -d ' \n')
+    echo "sk-${token_suffix}"
+}
+
 # 显示帮助信息
 show_help() {
     echo -e "${CYAN}Claude Code Companion 开发测试启动脚本${NC}"
@@ -33,13 +40,17 @@ show_help() {
     echo "  -P, --port PORT           设置服务端口 (默认: 8080)"
     echo "  -c, --config CONFIG       指定配置文件 (默认: config.yaml)"
     echo "  -n, --no-auth            禁用身份验证"
+    echo "  -C, --client-auth        启用客户端认证 (自动生成令牌)"
+    echo "  -t, --token TOKEN        指定客户端认证令牌"
     echo "  -b, --build              先编译再运行"
     echo "  -h, --help               显示此帮助信息"
     echo ""
     echo -e "${YELLOW}示例:${NC}"
-    echo "  $0                                    # 使用默认设置启动"
+    echo "  $0                                    # 使用默认设置启动(自动生成客户端认证令牌)"
     echo "  $0 -u myuser -p mypass               # 自定义用户名密码"
     echo "  $0 -n                                # 禁用身份验证"
+    echo "  $0 -C                                # 启用客户端认证"
+    echo "  $0 -t sk-abc123...                   # 使用指定的客户端认证令牌"
     echo "  $0 -b                                # 编译后运行"
     echo "  $0 -P 9090                           # 使用端口9090"
 }
@@ -49,7 +60,14 @@ USERNAME="$DEFAULT_USERNAME"
 PASSWORD="$DEFAULT_PASSWORD"
 PORT="$DEFAULT_PORT"
 NO_AUTH=false
+CLIENT_AUTH=false
+CLIENT_TOKEN=""
 BUILD_FIRST=false
+
+# 如果没有任何参数，默认启用客户端认证
+if [ $# -eq 0 ]; then
+    CLIENT_AUTH=true
+fi
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -72,6 +90,15 @@ while [[ $# -gt 0 ]]; do
         -n|--no-auth)
             NO_AUTH=true
             shift
+            ;;
+        -C|--client-auth)
+            CLIENT_AUTH=true
+            shift
+            ;;
+        -t|--token)
+            CLIENT_AUTH=true
+            CLIENT_TOKEN="$2"
+            shift 2
             ;;
         -b|--build)
             BUILD_FIRST=true
@@ -131,6 +158,23 @@ else
     unset ADMIN_USERNAME
     unset ADMIN_PASSWORD
     echo -e "${YELLOW}⚠️  身份验证已禁用${NC}"
+fi
+
+# 设置客户端认证令牌
+if [ "$CLIENT_AUTH" = true ]; then
+    if [ -z "$CLIENT_TOKEN" ]; then
+        # 自动生成令牌
+        CLIENT_TOKEN=$(generate_client_auth_token)
+        echo -e "${GREEN}🔑 客户端认证已启用 (自动生成令牌)${NC}"
+    else
+        echo -e "${GREEN}🔑 客户端认证已启用 (使用指定令牌)${NC}"
+    fi
+    export CLIENT_AUTH_TOKEN="$CLIENT_TOKEN"
+    echo -e "   认证令牌: ${YELLOW}$CLIENT_TOKEN${NC}"
+    echo -e "${CYAN}💡 提示: 客户端请求需要添加请求头 Authorization: Bearer $CLIENT_TOKEN${NC}"
+else
+    unset CLIENT_AUTH_TOKEN
+    echo -e "${YELLOW}⚠️  客户端认证已禁用${NC}"
 fi
 
 # 显示访问信息

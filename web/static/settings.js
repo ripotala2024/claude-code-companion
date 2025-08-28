@@ -23,6 +23,25 @@ document.addEventListener('DOMContentLoaded', function() {
             saveSettings();
         }
     });
+    
+    // Add event listeners for client auth buttons
+    const generateTokenBtn = document.getElementById('generateTokenBtn');
+    const copyTokenBtn = document.getElementById('copyTokenBtn');
+    const clientAuthEnabled = document.getElementById('clientAuthEnabled');
+    
+    if (generateTokenBtn) {
+        generateTokenBtn.addEventListener('click', generateClientToken);
+    }
+    
+    if (copyTokenBtn) {
+        copyTokenBtn.addEventListener('click', copyTokenToClipboard);
+    }
+    
+    if (clientAuthEnabled) {
+        clientAuthEnabled.addEventListener('change', toggleClientAuthControls);
+        // 初始化状态
+        toggleClientAuthControls();
+    }
 });
 
 function collectFormData() {
@@ -47,6 +66,10 @@ function collectFormData() {
             health_check_timeout: document.getElementById('healthCheckTimeout').value,
             check_interval: document.getElementById('checkInterval').value,
             recovery_threshold: parseInt(document.getElementById('recoveryThreshold').value)
+        },
+        client_auth: {
+            enabled: document.getElementById('clientAuthEnabled').checked,
+            required_token: document.getElementById('clientAuthToken').value
         }
     };
 }
@@ -126,5 +149,127 @@ function resetSettings() {
     document.getElementById('checkInterval').value = originalConfig.timeouts.check_interval;
     document.getElementById('recoveryThreshold').value = originalConfig.timeouts.recovery_threshold;
     
+    // Restore client auth settings
+    if (originalConfig.client_auth) {
+        document.getElementById('clientAuthEnabled').checked = originalConfig.client_auth.enabled;
+        document.getElementById('clientAuthToken').value = originalConfig.client_auth.required_token;
+        toggleClientAuthControls();
+    }
+    
     showAlert('配置已重置为初始值', 'info');
+}
+
+// 生成客户端认证令牌
+function generateClientToken() {
+    const generateBtn = document.getElementById('generateTokenBtn');
+    const originalText = generateBtn.innerHTML;
+    
+    // 显示加载状态
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    generateBtn.disabled = true;
+    
+    apiRequest('/admin/api/settings/generate-client-token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // 更新令牌输入框
+        document.getElementById('clientAuthToken').value = data.token;
+        showAlert('令牌生成成功！请记得保存配置。', 'success');
+    })
+    .catch(error => {
+        console.error('Error generating token:', error);
+        showAlert('生成令牌失败: ' + error.message, 'danger');
+    })
+    .finally(() => {
+        // 恢复按钮状态
+        generateBtn.innerHTML = originalText;
+        generateBtn.disabled = false;
+    });
+}
+
+// 复制令牌到剪贴板
+function copyTokenToClipboard() {
+    const tokenInput = document.getElementById('clientAuthToken');
+    const token = tokenInput.value;
+    
+    if (!token) {
+        showAlert('没有令牌可复制，请先生成令牌', 'warning');
+        return;
+    }
+    
+    // 使用现代 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(token)
+            .then(() => {
+                showAlert('令牌已复制到剪贴板', 'success');
+            })
+            .catch(err => {
+                console.error('复制失败:', err);
+                fallbackCopyTextToClipboard(token);
+            });
+    } else {
+        // 降级处理
+        fallbackCopyTextToClipboard(token);
+    }
+}
+
+// 降级复制方法
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showAlert('令牌已复制到剪贴板', 'success');
+        } else {
+            showAlert('复制失败，请手动复制', 'warning');
+        }
+    } catch (err) {
+        console.error('复制失败:', err);
+        showAlert('复制失败，请手动复制', 'warning');
+    }
+    
+    document.body.removeChild(textArea);
+}
+
+// 切换客户端认证控件状态
+function toggleClientAuthControls() {
+    const enabled = document.getElementById('clientAuthEnabled').checked;
+    const tokenInput = document.getElementById('clientAuthToken');
+    const generateBtn = document.getElementById('generateTokenBtn');
+    const copyBtn = document.getElementById('copyTokenBtn');
+    
+    // 根据启用状态切换控件的可用性
+    tokenInput.style.opacity = enabled ? '1' : '0.5';
+    generateBtn.disabled = !enabled;
+    copyBtn.disabled = !enabled;
+    
+    if (enabled) {
+        generateBtn.classList.remove('btn-outline-secondary');
+        generateBtn.classList.add('btn-outline-primary');
+        copyBtn.classList.remove('btn-outline-secondary');
+        copyBtn.classList.add('btn-outline-secondary');
+    } else {
+        generateBtn.classList.remove('btn-outline-primary');
+        generateBtn.classList.add('btn-outline-secondary');
+        copyBtn.classList.remove('btn-outline-secondary');
+        copyBtn.classList.add('btn-outline-secondary');
+    }
 }

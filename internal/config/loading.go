@@ -117,6 +117,10 @@ func generateDefaultConfig(filename string) error {
 			Password:       Default.Auth.Password,
 			SessionTimeout: Default.Auth.SessionTimeout,
 		},
+		ClientAuth: ClientAuthConfig{
+			Enabled:       Default.ClientAuth.Enabled,
+			RequiredToken: Default.ClientAuth.RequiredToken,
+		},
 	}
 
 	// 序列化为YAML
@@ -190,6 +194,12 @@ func applyEnvironmentOverrides(config *Config) error {
 	// 如果设置了用户名或密码，但Auth配置为空，则使用默认值
 	if config.Auth.Enabled && config.Auth.SessionTimeout == "" {
 		config.Auth.SessionTimeout = Default.Auth.SessionTimeout
+	}
+
+	// 处理客户端认证令牌环境变量
+	if clientToken := os.Getenv("CLIENT_AUTH_TOKEN"); clientToken != "" {
+		config.ClientAuth.RequiredToken = clientToken
+		config.ClientAuth.Enabled = true // 如果设置了令牌，自动启用客户端认证
 	}
 
 	return nil
