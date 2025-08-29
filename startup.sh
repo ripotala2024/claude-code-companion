@@ -27,6 +27,25 @@ generate_client_auth_token() {
     echo "sk-${token_suffix}"
 }
 
+# 从配置文件中读取客户端认证令牌的函数
+get_client_token_from_config() {
+    local config_file="$1"
+    if [ -f "$config_file" ]; then
+        # 使用 awk 提取 client_auth.required_token 的值
+        local token=$(awk '
+            /^client_auth:/ { in_client_auth=1; next }
+            in_client_auth && /^[[:space:]]*required_token:/ {
+                gsub(/^[[:space:]]*required_token:[[:space:]]*/, "")
+                gsub(/[[:space:]]*$/, "")
+                print $0
+                exit
+            }
+            /^[[:alpha:]]/ && !/^[[:space:]]/ { in_client_auth=0 }
+        ' "$config_file")
+        echo "$token"
+    fi
+}
+
 # 显示帮助信息
 show_help() {
     echo -e "${CYAN}Claude Code Companion 开发测试启动脚本${NC}"
@@ -40,17 +59,22 @@ show_help() {
     echo "  -P, --port PORT           设置服务端口 (默认: 8080)"
     echo "  -c, --config CONFIG       指定配置文件 (默认: config.yaml)"
     echo "  -n, --no-auth            禁用身份验证"
-    echo "  -C, --client-auth        启用客户端认证 (自动生成令牌)"
+    echo "  -C, --client-auth        启用客户端认证 (按优先级获取令牌)"
     echo "  -t, --token TOKEN        指定客户端认证令牌"
     echo "  -b, --build              先编译再运行"
     echo "  -h, --help               显示此帮助信息"
     echo ""
+    echo -e "${YELLOW}客户端令牌优先级规则:${NC}"
+    echo "  1. 命令行参数 -t 指定的令牌（最高优先级）"
+    echo "  2. config.yaml 中 client_auth.required_token 的值"
+    echo "  3. 自动生成的令牌（最低优先级）"
+    echo ""
     echo -e "${YELLOW}示例:${NC}"
-    echo "  $0                                    # 使用默认设置启动(自动生成客户端认证令牌)"
+    echo "  $0                                    # 使用默认设置启动(依次检查配置文件令牌或自动生成)"
     echo "  $0 -u myuser -p mypass               # 自定义用户名密码"
     echo "  $0 -n                                # 禁用身份验证"
-    echo "  $0 -C                                # 启用客户端认证"
-    echo "  $0 -t sk-abc123...                   # 使用指定的客户端认证令牌"
+    echo "  $0 -C                                # 启用客户端认证(检查配置文件或自动生成令牌)"
+    echo "  $0 -t sk-abc123...                   # 使用指定的客户端认证令牌(最高优先级)"
     echo "  $0 -b                                # 编译后运行"
     echo "  $0 -P 9090                           # 使用端口9090"
 }
@@ -162,14 +186,31 @@ fi
 
 # 设置客户端认证令牌
 if [ "$CLIENT_AUTH" = true ]; then
-    if [ -z "$CLIENT_TOKEN" ]; then
-        # 自动生成令牌
-        CLIENT_TOKEN=$(generate_client_auth_token)
-        echo -e "${GREEN}🔑 客户端认证已启用 (自动生成令牌)${NC}"
+    # 优先级规则：
+    # 1. 命令行参数 -t 指定的令牌（最高优先级）
+    # 2. config.yaml 中 client_auth.required_token 的值
+    # 3. 自动生成的令牌（最低优先级）
+    
+    if [ -n "$CLIENT_TOKEN" ]; then
+        # 使用命令行指定的令牌
+        echo -e "${GREEN}🔑 客户端认证已启用 (使用命令行指定令牌)${NC}"
+        TOKEN_SOURCE="命令行参数"
     else
-        echo -e "${GREEN}🔑 客户端认证已启用 (使用指定令牌)${NC}"
+        # 尝试从配置文件中读取令牌
+        CONFIG_TOKEN=$(get_client_token_from_config "$CONFIG_FILE")
+        if [ -n "$CONFIG_TOKEN" ]; then
+            CLIENT_TOKEN="$CONFIG_TOKEN"
+            echo -e "${GREEN}🔑 客户端认证已启用 (使用配置文件令牌)${NC}"
+            TOKEN_SOURCE="配置文件 $CONFIG_FILE"
+        else
+            # 自动生成令牌
+            CLIENT_TOKEN=$(generate_client_auth_token)
+            echo -e "${GREEN}🔑 客户端认证已启用 (自动生成令牌)${NC}"
+            TOKEN_SOURCE="自动生成"
+        fi
     fi
     export CLIENT_AUTH_TOKEN="$CLIENT_TOKEN"
+    echo -e "   令牌来源: ${CYAN}$TOKEN_SOURCE${NC}"
     echo -e "   认证令牌: ${YELLOW}$CLIENT_TOKEN${NC}"
     echo -e "${CYAN}💡 提示: 客户端请求需要添加请求头 Authorization: Bearer $CLIENT_TOKEN${NC}"
 else
