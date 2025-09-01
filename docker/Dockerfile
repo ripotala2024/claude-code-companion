@@ -1,11 +1,16 @@
-# 多阶段构建 - 构建阶段
+# 多阶段构建 - 构建阶段  
 FROM golang:1.23-alpine AS builder
 
 # 安装构建依赖
-RUN apk add --no-cache git make ca-certificates
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk add --no-cache git make ca-certificates
 
 # 设置工作目录
 WORKDIR /app
+
+# 设置Go模块代理
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=sum.golang.google.cn
 
 # 复制依赖文件
 COPY go.mod go.sum ./
@@ -26,7 +31,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 FROM alpine:3.18
 
 # 安装运行时依赖
-RUN apk --no-cache add \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk --no-cache add \
     ca-certificates \
     curl \
     tzdata \
@@ -49,7 +55,8 @@ COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 # 创建数据目录并设置权限
 RUN mkdir -p /data/logs /data/config && \
     chmod +x /docker-entrypoint.sh && \
-    chown -R appuser:appgroup /app /data
+    chown -R appuser:appgroup /app /data && \
+    chmod -R 755 /data
 
 # 切换到非root用户
 USER appuser

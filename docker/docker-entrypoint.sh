@@ -10,9 +10,10 @@ echo "Log directory: ${LOG_DIR:-/data/logs}"
 CONFIG_FILE=${CONFIG_FILE:-/data/config/config.yaml}
 LOG_DIR=${LOG_DIR:-/data/logs}
 
-# 确保配置目录存在
+# 确保配置目录存在并设置正确权限
 CONFIG_DIR=$(dirname "$CONFIG_FILE")
 mkdir -p "$CONFIG_DIR"
+chmod 755 "$CONFIG_DIR"
 
 # 如果配置文件不存在，从模板创建
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -25,8 +26,14 @@ if [ ! -f "$CONFIG_FILE" ]; then
     fi
 fi
 
-# 确保日志目录存在
+# 确保配置文件有正确的权限
+if [ -f "$CONFIG_FILE" ]; then
+    chmod 644 "$CONFIG_FILE"
+fi
+
+# 确保日志目录存在并设置正确权限
 mkdir -p "$LOG_DIR"
+chmod 755 "$LOG_DIR"
 
 # 检查配置文件权限
 if [ ! -r "$CONFIG_FILE" ]; then
