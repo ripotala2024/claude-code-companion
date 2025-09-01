@@ -38,10 +38,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     tzdata \
     && rm -rf /var/cache/apk/*
 
-# 创建非root用户和组
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
-
 # 设置工作目录
 WORKDIR /app
 
@@ -55,11 +51,10 @@ COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 # 创建数据目录并设置权限
 RUN mkdir -p /data/logs /data/config && \
     chmod +x /docker-entrypoint.sh && \
-    chown -R appuser:appgroup /app /data && \
     chmod -R 755 /data
 
-# 切换到非root用户
-USER appuser
+# 保持root用户运行（注释掉USER指令）
+# USER appuser
 
 # 暴露端口
 EXPOSE 8080
