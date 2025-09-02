@@ -46,6 +46,27 @@ get_client_token_from_config() {
     fi
 }
 
+# 从配置文件中读取认证信息的函数
+get_auth_from_config() {
+    local config_file="$1"
+    local field="$2"  # username 或 password
+    
+    if [ -f "$config_file" ]; then
+        # 使用 awk 提取 auth.username 或 auth.password 的值
+        local value=$(awk -v field="$field" '
+            /^auth:/ { in_auth=1; next }
+            in_auth && $0 ~ "^[[:space:]]*" field ":" {
+                gsub(/^[[:space:]]*[^:]*:[[:space:]]*/, "")
+                gsub(/[[:space:]]*$/, "")
+                print $0
+                exit
+            }
+            /^[[:alpha:]]/ && !/^[[:space:]]/ { in_auth=0 }
+        ' "$config_file")
+        echo "$value"
+    fi
+}
+
 # 显示帮助信息
 show_help() {
     echo -e "${CYAN}Claude Code Companion 开发测试启动脚本${NC}"
@@ -54,8 +75,8 @@ show_help() {
     echo "  $0 [选项]"
     echo ""
     echo -e "${YELLOW}选项:${NC}"
-    echo "  -u, --username USERNAME    设置管理员用户名 (默认: admin)"
-    echo "  -p, --password PASSWORD    设置管理员密码 (默认: test123)"
+    echo "  -u, --username USERNAME    设置管理员用户名 (优先级：命令行 > 配置文件 > 默认值)"
+    echo "  -p, --password PASSWORD    设置管理员密码 (优先级：命令行 > 配置文件 > 默认值)"
     echo "  -P, --port PORT           设置服务端口 (默认: 8080)"
     echo "  -c, --config CONFIG       指定配置文件 (默认: config.yaml)"
     echo "  -n, --no-auth            禁用身份验证"
@@ -70,8 +91,8 @@ show_help() {
     echo "  3. 自动生成的令牌（最低优先级）"
     echo ""
     echo -e "${YELLOW}示例:${NC}"
-    echo "  $0                                    # 使用默认设置启动(依次检查配置文件令牌或自动生成)"
-    echo "  $0 -u myuser -p mypass               # 自定义用户名密码"
+    echo "  $0                                    # 使用配置文件中的认证信息，没有则使用默认值"
+    echo "  $0 -u myuser -p mypass               # 强制使用指定的用户名密码"
     echo "  $0 -n                                # 禁用身份验证"
     echo "  $0 -C                                # 启用客户端认证(检查配置文件或自动生成令牌)"
     echo "  $0 -t sk-abc123...                   # 使用指定的客户端认证令牌(最高优先级)"
@@ -87,6 +108,8 @@ NO_AUTH=false
 CLIENT_AUTH=false
 CLIENT_TOKEN=""
 BUILD_FIRST=false
+CONFIG_USERNAME_SET=false
+CONFIG_PASSWORD_SET=false
 
 # 如果没有任何参数，默认启用客户端认证
 if [ $# -eq 0 ]; then
@@ -97,10 +120,12 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -u|--username)
             USERNAME="$2"
+            CONFIG_USERNAME_SET=true
             shift 2
             ;;
         -p|--password)
             PASSWORD="$2"
+            CONFIG_PASSWORD_SET=true
             shift 2
             ;;
         -P|--port)
@@ -139,6 +164,23 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# 从配置文件中读取认证信息（如果命令行没有指定的话）
+if [ "$CONFIG_USERNAME_SET" = false ]; then
+    CONFIG_USERNAME=$(get_auth_from_config "$CONFIG_FILE" "username")
+    if [ -n "$CONFIG_USERNAME" ]; then
+        USERNAME="$CONFIG_USERNAME"
+        echo -e "${CYAN}📄 从配置文件读取用户名: $USERNAME${NC}"
+    fi
+fi
+
+if [ "$CONFIG_PASSWORD_SET" = false ]; then
+    CONFIG_PASSWORD=$(get_auth_from_config "$CONFIG_FILE" "password")
+    if [ -n "$CONFIG_PASSWORD" ]; then
+        PASSWORD="$CONFIG_PASSWORD"
+        echo -e "${CYAN}📄 从配置文件读取密码${NC}"
+    fi
+fi
 
 # 显示启动信息
 echo -e "${CYAN}🚀 Claude Code Companion 开发测试启动${NC}"
