@@ -44,6 +44,10 @@ config.yaml
 config.yml
 config.json
 
+# Sensitive files with API keys and credentials
+.mcp.json
+build-image.sh
+
 # Temporary files
 *.tmp
 *.temp
@@ -80,16 +84,3 @@ node_modules/
 .claude/*
 
 .specstory/
-build-image.sh
-
-# 灵妙插件相关文件忽略规则
-.cursor/
-**/.DS_Store
-.augment/
-.claude/backups/
-.claude/ide/
-.claude/statsig/
-.claude/projects/
-.claude/shell-snapshots/
-.claude/todos/
-.mcp.json
