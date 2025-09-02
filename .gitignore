@@ -44,6 +44,10 @@ config.yaml
 config.yml
 config.json
 
+# Sensitive files with API keys and credentials
+.mcp.json
+build-image.sh
+
 # Temporary files
 *.tmp
 *.temp
