@@ -108,6 +108,10 @@ func (e *Executor) createPredeclaredEnvironment(req *http.Request) starlark.Stri
 		"contains": starlark.NewBuiltin("contains", starlarkContains),
 		"startswith": starlark.NewBuiltin("startswith", starlarkStartswith),
 		"endswith": starlark.NewBuiltin("endswith", starlarkEndswith),
+		"now":     starlark.NewBuiltin("now", starlarkNow),
+		"hour":    starlark.NewBuiltin("hour", starlarkHour),
+		"minute":  starlark.NewBuiltin("minute", starlarkMinute),
+		"weekday": starlark.NewBuiltin("weekday", starlarkWeekday),
 	}
 	
 	// 添加struct模块用于创建对象
@@ -222,4 +226,38 @@ func starlarkEndswith(thread *starlark.Thread, _ *starlark.Builtin, args starlar
 	}
 	result := strings.HasSuffix(string(s), string(suffix))
 	return starlark.Bool(result), nil
+}
+
+// 时间相关的Starlark函数
+
+// starlarkNow 返回当前时间戳(秒)
+func starlarkNow(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackArgs("now", args, kwargs); err != nil {
+		return nil, err
+	}
+	return starlark.MakeInt64(time.Now().Unix()), nil
+}
+
+// starlarkHour 返回当前小时(0-23)
+func starlarkHour(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackArgs("hour", args, kwargs); err != nil {
+		return nil, err
+	}
+	return starlark.MakeInt(time.Now().Hour()), nil
+}
+
+// starlarkMinute 返回当前分钟(0-59)
+func starlarkMinute(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackArgs("minute", args, kwargs); err != nil {
+		return nil, err
+	}
+	return starlark.MakeInt(time.Now().Minute()), nil
+}
+
+// starlarkWeekday 返回当前星期几(0=Sunday, 1=Monday, ..., 6=Saturday)
+func starlarkWeekday(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := starlark.UnpackArgs("weekday", args, kwargs); err != nil {
+		return nil, err
+	}
+	return starlark.MakeInt(int(time.Now().Weekday())), nil
 }
