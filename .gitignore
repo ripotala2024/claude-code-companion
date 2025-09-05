@@ -95,3 +95,4 @@ node_modules/
 .claude/projects/
 .claude/shell-snapshots/
 .claude/todos/
+docker-compose-pro.yml
